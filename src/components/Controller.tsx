@@ -1,377 +1,342 @@
-import React, { forwardRef, useEffect, useImperativeHandle, useState } from 'react';
-import Card from '@mui/material/Card';
-import Button from '@mui/material/Button';
-import Grid from '@mui/material/Grid';
-import InputLabel from '@mui/material/InputLabel';
-import PlayArrowIcon from '@mui/icons-material/PlayArrow';
-import PauseIcon from '@mui/icons-material/Pause';
-import ReplayIcon from '@mui/icons-material/Replay';
 import BorderColorIcon from '@mui/icons-material/BorderColor';
-import FiberManualRecordIcon from '@mui/icons-material/FiberManualRecord';
-import StopIcon from '@mui/icons-material/Stop';
-import ButtonGroup from '@mui/material/ButtonGroup';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import TextField from '@mui/material/TextField';
-import CardHeader from '@mui/material/CardHeader';
-import CardContent from '@mui/material/CardContent';
-import FormControl from '@mui/material/FormControl';
-import MenuItem from '@mui/material/MenuItem';
-import Select from '@mui/material/Select';
-import SettingsApplications from '@mui/icons-material/SettingsApplications';
-import SettingsBackupRestoreIcon from '@mui/icons-material/SettingsBackupRestore';
+import FiberManualRecordIcon from '@mui/icons-material/FiberManualRecord';
 import KeyboardIcon from '@mui/icons-material/Keyboard';
+import PauseIcon from '@mui/icons-material/Pause';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import ReplayIcon from '@mui/icons-material/Replay';
+import SettingsBackupRestoreIcon from '@mui/icons-material/SettingsBackupRestore';
+import SettingsApplicationsIcon from '@mui/icons-material/SettingsApplications';
+import StopIcon from '@mui/icons-material/Stop';
+import {
+  Box,
+  Button,
+  ButtonGroup,
+  Card,
+  CardContent,
+  CardHeader,
+  Collapse,
+  FormControl,
+  InputLabel,
+  MenuItem,
+  Select,
+  Stack,
+  TextField,
+  Typography,
+} from '@mui/material';
+import { memo, useEffect, useState } from 'react';
+import type { TimerControllerApi, TimerUiState } from '../timer/types';
 import Hotkey from './Hotkey';
-
 import './Controller.css';
-import Stack from '@mui/material/Stack';
-import Box from '@mui/material/Box';
 
-export enum ControllerEvent {
-  Init,
-  Ready,
-  Play,
-  Pause,
-  Replay,
-  Reset,
-  Mark,
-  Rec,
-  Stop,
+interface ControllerProps {
+  controller: TimerControllerApi;
+  uiState: TimerUiState;
 }
 
-const Controller = forwardRef(({ canvasRef }: any, ref) => {
-  const canvasProps = canvasRef.current ?? {};
-  const values = canvasProps['getValues'] ? canvasProps.getValues() : {};
+const STATUS_LABELS = {
+  countdown: {
+    play: 'Prepare to play',
+    record: 'Prepare to record',
+  },
+  init: 'Record a reference take to enable playback.',
+  pause: 'Playback paused.',
+  play: 'Playing the saved take.',
+  ready: 'Ready for playback or a new take.',
+  record: 'Recording a new take.',
+};
 
-  const [state, setState] = useState<ControllerEvent>(ControllerEvent.Init);
-  const [isShowSetting, setShowSetting] = useState<boolean>(false);
-  const [lang, setLang] = useState<string>('en');
-  const [total, setTotal] = useState<number>(values.total ?? 21);
-  const [frame, setFrame] = useState<number>(values.frame ?? 24);
-  const [prepare, setPrepare] = useState<number>(values.prepare ?? 3);
-  const [frameWidth, setFrameWidth] = useState<string>(values.frameWidth ?? 'normal');
-  const [frameThickness, setFrameThickness] = useState<string>(values.frameThickness ?? 'normal');
-
-  const [markingState, setMarkingState] = useState<string>('none');
-
-  useImperativeHandle(ref, () => {
-    return {
-      changeState(state: ControllerEvent) {
-        setState(state);
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    let isPress = false;
-    function keydown(e: KeyboardEvent) {
-      if (isPress) return;
-      isPress = true;
-      switch (e.key.toUpperCase()) {
-        case 'R':
-          replay();
-          break;
-        case ' ':
-          playPauseResume();
-          break;
-        case 'E':
-          markStart();
-          break;
-        case 'SHIFT':
-          markStart();
-          break;
-        case 'C':
-          recRecStop();
-          break;
-      }
-    }
-    function keyup(e: KeyboardEvent) {
-      isPress = false;
-      if (e.key.toUpperCase() === 'SHIFT') {
-        markEnd();
-      }
-    }
-
-    window.addEventListener('keydown', keydown);
-    window.addEventListener('keyup', keyup);
-
-    return () => {
-      window.removeEventListener('keydown', keydown);
-      window.removeEventListener('keyup', keyup);
-    }
-  }, [state]);
-
-  function changeState(state: ControllerEvent) {
-    switch (state) {
-      case ControllerEvent.Play:
-        setState(ControllerEvent.Play);
-        break;
-      case ControllerEvent.Pause:
-        setState(ControllerEvent.Pause);
-        break;
-      case ControllerEvent.Replay:
-        setState(ControllerEvent.Play);
-        break;
-      case ControllerEvent.Reset:
-        setState(ControllerEvent.Init);
-        break;
-      case ControllerEvent.Rec:
-        setState(ControllerEvent.Rec);
-        break;
-      case ControllerEvent.Stop:
-      case ControllerEvent.Ready:
-        setState(ControllerEvent.Ready);
-        break;
-    }
-    canvasRef.current.changeState(state);
-    setShowSetting(false);
-  }
-
-  function replay() {
-    changeState(ControllerEvent.Replay);
-  }
-
-  function playPauseResume() {
-    changeState(ControllerEvent.Play !== state ? ControllerEvent.Play : ControllerEvent.Pause);
-  }
-
-  function markStart() {
-    if (ControllerEvent.Rec === state) {
-      setMarkingState('marking');
-      canvasProps.startMark();
-    } else {
-      setMarkingState('none');
-      changeState(ControllerEvent.Reset);
-    }
-  }
-
-  function markEnd() {
-    if (ControllerEvent.Rec === state) {
-      setMarkingState('marked');
-      canvasProps.endMark();
-    }
-  }
-
-  function recRecStop() {
-    if (ControllerEvent.Stop === state) {
-      setMarkingState('none');
-    }
-    changeState(ControllerEvent.Rec === state ? ControllerEvent.Stop : ControllerEvent.Rec);
+function isInteractiveTarget(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) {
+    return false;
   }
 
   return (
-    <div className="controller">
-      <Card className={`setting-card ${isShowSetting ? 'show' : 'hidden'}`}>
-        <CardHeader
-          title="Settings"
-          subheader="Please change it to the setting you want and use it."
-          avatar={<SettingsApplications />}
-        />
-        <CardContent>
-          <Grid container spacing={4}>
-            <Grid item xs={12} sm={4}>
-              <FormControl fullWidth>
-                <InputLabel id="language-label" size="small">
-                  Language
-                </InputLabel>
-                <Select
-                  labelId="language-label"
-                  id="language"
-                  value={lang}
-                  label="Language"
-                  size="small"
-                  onChange={(e) => setLang(e.target.value)}
-                >
-                  <MenuItem value="ko">한국어</MenuItem>
-                  <MenuItem value="ja">日本語</MenuItem>
-                  <MenuItem value="en">English</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
+    target.isContentEditable || ['INPUT', 'OPTION', 'SELECT', 'TEXTAREA'].includes(target.tagName)
+  );
+}
 
-            <Grid item xs={12} sm={4}>
-              <TextField
-                fullWidth
-                type="number"
-                id="sec"
-                name="sec"
-                label="Seconds"
-                size="small"
-                autoComplete="off"
-                variant="outlined"
-                value={total}
-                onChange={(e) => {
-                  const value = Math.min(300, Math.max(1, Number(e.target.value) || 0));
-                  setTotal(value);
-                  canvasProps.setTotal(value);
-                }}
-              />
-            </Grid>
+const Controller = memo(function Controller({ controller, uiState }: ControllerProps) {
+  const [isShowSetting, setShowSetting] = useState(false);
 
-            <Grid item xs={12} sm={4}>
-              <TextField
-                fullWidth
-                type="number"
-                id="frame"
-                name="frame"
-                label="Frame Per Second"
-                size="small"
-                autoComplete="off"
-                variant="outlined"
-                value={frame}
-                onChange={(e) => {
-                  const value = Math.min(240, Math.max(1, Number(e.target.value) || 0));
-                  setFrame(value);
-                  canvasProps.setFrame(value);
-                }}
-              />
-            </Grid>
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (isInteractiveTarget(event.target)) {
+        return;
+      }
 
-            <Grid item xs={12} sm={4}>
-              <TextField
-                fullWidth
-                type="number"
-                id="prepare"
-                name="prepare"
-                label="Time to Prepare"
-                size="small"
-                autoComplete="off"
-                variant="outlined"
-                value={prepare}
-                onChange={(e) => {
-                  const value = Math.min(5, Math.max(0, Number(e.target.value) || 0));
-                  setPrepare(value);
-                  canvasProps.setPrepare(value);
-                }}
-              />
-            </Grid>
-            
-            <Grid item xs={12} sm={4}>
-              <FormControl fullWidth>
-                <InputLabel id="size-label" size="small">
-                  1 Frame Size
-                </InputLabel>
-                <Select
-                  labelId="size-label"
-                  id="size"
-                  value={frameWidth}
-                  label="1 Frame Size"
-                  size="small"
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    setFrameWidth(value);
-                    canvasProps.setFrameWidth(value);
-                  }}
-                >
-                  <MenuItem value="small">Small</MenuItem>
-                  <MenuItem value="normal">Normal</MenuItem>
-                  <MenuItem value="large">Large</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-            
-            <Grid item xs={12} sm={4}>
-              <FormControl fullWidth>
-                <InputLabel id="thickness-label" size="small">
-                  Thickness
-                </InputLabel>
-                <Select
-                  labelId="thickness-label"
-                  id="thickness"
-                  value={frameThickness}
-                  label="Thickness"
-                  size="small"
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    setFrameThickness(value);
-                    canvasProps.setFrameThickness(value);
-                  }}
-                >
-                  <MenuItem value="small">Small</MenuItem>
-                  <MenuItem value="normal">Normal</MenuItem>
-                  <MenuItem value="large">Large</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-          </Grid>
-        </CardContent>
-        <CardHeader
-          title="Hotkeys"
-          subheader="You can use the Hotkeys conveniently."
-          avatar={<KeyboardIcon />}
-        />
-        <CardContent>
-          <Stack spacing={{ xs: 1, sm: 2 }} direction="row" useFlexGap flexWrap="wrap">
-            <Box sx={{ flexGrow: 1 }}>
-              REPLAY: <Hotkey hotkey="R" />
-            </Box>
-            <Box sx={{ flexGrow: 1 }}>
-              PLAY / PAUSE / RESUME: <Hotkey hotkey="Space" />
-            </Box>
-            <Box sx={{ flexGrow: 1 }}>
-              RESET: <Hotkey hotkey="E" />
-            </Box>
-            <Box sx={{ flexGrow: 1 }}>
-              MARKING (Press): <Hotkey hotkey="Shift" />
-            </Box>
-            <Box sx={{ flexGrow: 1 }}>
-              REC / STOP: <Hotkey hotkey="C" />
-            </Box>
-          </Stack>
-        </CardContent>
-      </Card>
+      if (event.repeat && !event.code.startsWith('Shift')) {
+        return;
+      }
 
-      <ButtonGroup variant="text" color="info">
-        <Button
-          tabIndex={-1}
-          sx={{ color: 'lightblue' }}
-          startIcon={<ReplayIcon />}
-          disabled={![ControllerEvent.Play, ControllerEvent.Pause].includes(state)}
-          onClick={replay}
-        >
-          Replay
-        </Button>
-        <Button
-          tabIndex={-1}
-          sx={{ color: ControllerEvent.Play !== state ? 'green' : 'orange' }}
-          startIcon={ControllerEvent.Play !== state ? <PlayArrowIcon /> : <PauseIcon />}
-          disabled={![ControllerEvent.Ready, ControllerEvent.Play, ControllerEvent.Pause].includes(state)}
-          onClick={playPauseResume}
-        >
-          {ControllerEvent.Pause === state ? 'Resume' : ControllerEvent.Play === state ? 'Pause' : 'Play'}
-        </Button>
-        <Button
-          tabIndex={-1}
-          sx={{ color: 'white' }}
-          startIcon={ControllerEvent.Rec === state ? <BorderColorIcon /> : <SettingsBackupRestoreIcon />}
-          disabled={(ControllerEvent.Rec !== state && markingState === 'none')}
-          onMouseDown={markStart}
-          onMouseUp={markEnd}
-          onTouchStart={markStart}
-          onTouchEnd={markEnd}
-        >
-          {markingState === 'marking' ? 'Marking' : ControllerEvent.Rec === state ? 'Mark' : 'Reset'}
-        </Button>
-        <Button
-          tabIndex={-1}
-          startIcon={ControllerEvent.Rec === state ? <StopIcon /> : <FiberManualRecordIcon />}
-          sx={{ color: 'red' }}
-          disabled={![ControllerEvent.Init, ControllerEvent.Ready, ControllerEvent.Pause, ControllerEvent.Rec].includes(state)}
-          onClick={recRecStop}
-        >
-          {ControllerEvent.Rec === state ? 'Stop' : 'Rec'}
-        </Button>
-        <Button
-          tabIndex={-1}
-          aria-label="setting"
-          sx={{ color: 'white' }}
-          onClick={() => {
-            setShowSetting((prev) => !prev);
-          }}
-        >
-          {isShowSetting ? <ExpandMoreIcon /> : <ExpandLessIcon />}
-        </Button>
-      </ButtonGroup>
+      switch (event.code) {
+        case 'KeyR':
+          if (uiState.canReplay) {
+            event.preventDefault();
+            controller.replay();
+          }
+          break;
+        case 'Space':
+          if (uiState.canPlay) {
+            event.preventDefault();
+            controller.playPause();
+          }
+          break;
+        case 'KeyE':
+          if (uiState.canReset) {
+            event.preventDefault();
+            controller.reset();
+          }
+          break;
+        case 'KeyC':
+          if (uiState.canRecord) {
+            event.preventDefault();
+            controller.recordToggle();
+          }
+          break;
+        case 'ShiftLeft':
+        case 'ShiftRight':
+          if (uiState.canMark) {
+            event.preventDefault();
+            controller.markStart();
+          }
+          break;
+        default:
+          break;
+      }
+    };
+
+    const handleKeyUp = (event: KeyboardEvent) => {
+      if (event.code === 'ShiftLeft' || event.code === 'ShiftRight') {
+        controller.markEnd();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, [
+    controller,
+    uiState.canMark,
+    uiState.canPlay,
+    uiState.canRecord,
+    uiState.canReplay,
+    uiState.canReset,
+  ]);
+
+  const statusLabel =
+    uiState.mode === 'countdown' && uiState.countdownTarget
+      ? STATUS_LABELS.countdown[uiState.countdownTarget]
+      : STATUS_LABELS[uiState.mode];
+
+  const playLabel =
+    uiState.mode === 'play'
+      ? 'Pause'
+      : uiState.mode === 'pause'
+        ? 'Resume'
+        : uiState.mode === 'countdown' && uiState.countdownTarget === 'play'
+          ? 'Cancel'
+          : 'Play';
+
+  const resetOrMarkLabel =
+    uiState.mode === 'record' ? (uiState.isMarking ? 'Marking' : 'Mark') : 'Reset';
+
+  const recordLabel =
+    uiState.mode === 'record'
+      ? 'Stop'
+      : uiState.mode === 'countdown' && uiState.countdownTarget === 'record'
+        ? 'Cancel'
+        : 'Rec';
+
+  return (
+    <div className="controller-shell">
+      <div className="controller-inner">
+        <div className="controller-status">
+          <Typography variant="overline">AniTimer</Typography>
+          <Typography variant="body2">{statusLabel}</Typography>
+        </div>
+
+        <Collapse in={isShowSetting} timeout={160}>
+          <Card className="settings-card" elevation={0}>
+            <CardHeader
+              avatar={<SettingsApplicationsIcon color="primary" />}
+              subheader="Reference take options"
+              title="Settings"
+            />
+            <CardContent>
+              <div className="settings-grid">
+                <div className="settings-field">
+                  <TextField
+                    fullWidth
+                    label="Seconds"
+                    size="small"
+                    type="number"
+                    value={uiState.config.totalSeconds}
+                    onChange={(event) => {
+                      controller.updateConfig({
+                        totalSeconds: Number(event.target.value) || 0,
+                      });
+                    }}
+                  />
+                </div>
+
+                <div className="settings-field">
+                  <TextField
+                    fullWidth
+                    label="Frames Per Second"
+                    size="small"
+                    type="number"
+                    value={uiState.config.fps}
+                    onChange={(event) => {
+                      controller.updateConfig({
+                        fps: Number(event.target.value) || 0,
+                      });
+                    }}
+                  />
+                </div>
+
+                <div className="settings-field">
+                  <TextField
+                    fullWidth
+                    label="Time to Prepare"
+                    size="small"
+                    type="number"
+                    value={uiState.config.prepareSeconds}
+                    onChange={(event) => {
+                      controller.updateConfig({
+                        prepareSeconds: Number(event.target.value) || 0,
+                      });
+                    }}
+                  />
+                </div>
+
+                <div className="settings-field settings-field-wide">
+                  <FormControl fullWidth size="small">
+                    <InputLabel id="frame-width-label">1 Frame Size</InputLabel>
+                    <Select
+                      label="1 Frame Size"
+                      labelId="frame-width-label"
+                      value={uiState.config.frameWidth}
+                      onChange={(event) => {
+                        controller.updateConfig({
+                          frameWidth: event.target.value as TimerUiState['config']['frameWidth'],
+                        });
+                      }}
+                    >
+                      <MenuItem value="small">Small</MenuItem>
+                      <MenuItem value="normal">Normal</MenuItem>
+                      <MenuItem value="large">Large</MenuItem>
+                    </Select>
+                  </FormControl>
+                </div>
+
+                <div className="settings-field settings-field-wide">
+                  <FormControl fullWidth size="small">
+                    <InputLabel id="frame-thickness-label">Thickness</InputLabel>
+                    <Select
+                      label="Thickness"
+                      labelId="frame-thickness-label"
+                      value={uiState.config.frameThickness}
+                      onChange={(event) => {
+                        controller.updateConfig({
+                          frameThickness: event.target
+                            .value as TimerUiState['config']['frameThickness'],
+                        });
+                      }}
+                    >
+                      <MenuItem value="small">Small</MenuItem>
+                      <MenuItem value="normal">Normal</MenuItem>
+                      <MenuItem value="large">Large</MenuItem>
+                    </Select>
+                  </FormControl>
+                </div>
+              </div>
+            </CardContent>
+
+            <CardHeader
+              avatar={<KeyboardIcon color="primary" />}
+              subheader="Global keyboard shortcuts"
+              title="Hotkeys"
+            />
+            <CardContent>
+              <Stack direction="row" flexWrap="wrap" gap={1.5}>
+                <Box className="hotkey-entry">
+                  Replay <Hotkey hotkey="R" />
+                </Box>
+                <Box className="hotkey-entry">
+                  Play / Pause <Hotkey hotkey="Space" />
+                </Box>
+                <Box className="hotkey-entry">
+                  Reset <Hotkey hotkey="E" />
+                </Box>
+                <Box className="hotkey-entry">
+                  Mark (hold) <Hotkey hotkey="Shift" />
+                </Box>
+                <Box className="hotkey-entry">
+                  Rec / Stop <Hotkey hotkey="C" />
+                </Box>
+              </Stack>
+            </CardContent>
+          </Card>
+        </Collapse>
+
+        <ButtonGroup className="controller-actions" color="primary" variant="outlined">
+          <Button
+            disabled={!uiState.canReplay}
+            onClick={controller.replay}
+            startIcon={<ReplayIcon />}
+          >
+            Replay
+          </Button>
+
+          <Button
+            color={uiState.mode === 'play' ? 'warning' : 'success'}
+            disabled={!uiState.canPlay}
+            onClick={controller.playPause}
+            startIcon={uiState.mode === 'play' ? <PauseIcon /> : <PlayArrowIcon />}
+          >
+            {playLabel}
+          </Button>
+
+          <Button
+            color={uiState.mode === 'record' ? 'secondary' : 'inherit'}
+            disabled={uiState.mode === 'record' ? false : !uiState.canReset}
+            onClick={uiState.mode === 'record' ? undefined : controller.reset}
+            onMouseDown={uiState.mode === 'record' ? controller.markStart : undefined}
+            onMouseUp={uiState.mode === 'record' ? controller.markEnd : undefined}
+            onTouchEnd={uiState.mode === 'record' ? controller.markEnd : undefined}
+            onTouchStart={uiState.mode === 'record' ? controller.markStart : undefined}
+            startIcon={
+              uiState.mode === 'record' ? <BorderColorIcon /> : <SettingsBackupRestoreIcon />
+            }
+          >
+            {resetOrMarkLabel}
+          </Button>
+
+          <Button
+            color="error"
+            disabled={!uiState.canRecord}
+            onClick={controller.recordToggle}
+            startIcon={uiState.mode === 'record' ? <StopIcon /> : <FiberManualRecordIcon />}
+          >
+            {recordLabel}
+          </Button>
+
+          <Button
+            aria-label="toggle-settings"
+            onClick={() => {
+              setShowSetting((previous) => !previous);
+            }}
+          >
+            {isShowSetting ? <ExpandMoreIcon /> : <ExpandLessIcon />}
+          </Button>
+        </ButtonGroup>
+      </div>
     </div>
   );
 });

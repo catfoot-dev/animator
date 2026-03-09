@@ -1,12 +1,12 @@
 span.hotkey {
   cursor: pointer;
-  color: #71D4FE;
+  color: #71d4fe;
   margin: 0 5px;
   padding: 5px 10px;
   text-align: center;
   text-shadow: 0px 0px 5px #71d4fe;
   border-radius: 6px;
-  background: #2F3336;
-  box-shadow: 0px 3px 3px rgba(0, 0, 0, .7);
+  background: #2f3336;
+  box-shadow: 0px 3px 3px rgba(0, 0, 0, 0.7);
   overflow: hidden;
 }
